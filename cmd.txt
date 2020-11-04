@@ -1,0 +1,5 @@
+python hist.py -d /data_partition/yang/images/gen_dataset/databaserelease2/ -a live.png
+python dequan_dir.py -i /data_partition/yang/images/gen_dataset/databaserelease2/ -o test/live_dequan
+
+
+python hist.py -d ./test/live_dequan/ -a live_deq.png

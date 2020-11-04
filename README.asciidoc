@@ -1,0 +1,138 @@
+== Usage
+
+See the PyDoc in source code 
+
+The library is located at `./quandequan`, some scripts are also 
+prepared for you.
+
+This project depends on `tifffile`, `numpy` and `torch`. 
+
+- `cmd.txt`: some demo commands
+- `hist.py`: demo for the effect of dequantisation
+- `show_tiff.py`: since the TIFF files save with this package cannot
+  be opened by most image viewer, you can use this (quick and dirty) script to
+  view the image.
+- `test_float.py`: the script contents for a demo in the following sections. 
+
+
+== 0. What are correct quantisation and dequantisation
+
+=== 0.1 dequantisation
+
+Scaling x in {0, ..., 255} to [0, 1] directly?  BOOM
+[RNADE] states that 'Modeling
+discretized data using a real-valued distribution can lead to
+arbitrarily high density values, by locating
+narrow high density spike on each of the possible discrete values.' They
+think this is 'cheating'.
+
+How to handle this?  
+
+'we added noise uniformly distributed between 0 and 1 to the value of
+each pixel. We then divided by 256, making each pixel take a value in
+the range [0, 1].'  
+
+The problem with this method is very slight, since the probability to
+get each number in [0, 1] is 0.  However, there are one slight issue:
+the probability of getting 0 and 1 is only half of the probability of
+getting any other number.  To handle this, we can use the following way: 
+
+	(x + random(0, 1)) / 256 / MINTOONE
+
+
+where `MINTOONE` is the greatest number that `(255 + random(0, 1)) / 256` can generate
+and `random(0, 1)` generates random number in [0, 1)
+
+You may say it is possible to merge two number in (0, 1) to one (or even
+more pairs), but we definitely care more about 0 and 1 than the
+number in between. 
+
+
+=== 0.2 quantisation
+
+For quantisation, let's see
+https://pytorch.org/docs/stable/_modules/torchvision/transforms/functional.html#to_pil_image
+
+This has been a long misconcept.  
+
+Suppose x is correctly in [0, 1] 
+
+They multiply x by 255, then round it downward.  Then, suppose the
+image is generated with a uniform distribution in [0, 1]; we are
+expecting to see the mapped distribution also a uniform distribution in
+{0, ..., 255}. 
+
+What about other probability distribution?  as long as the distribution
+is without odd point, it has 0% of probability to be 255, after being scaled
+to [0, 1].
+
+Even worse, if F and F' are mathematical inverse to each other, but
+their calculation will result in 0.01% of error, F'(F(x)) will loss the
+information of x[x==255]
+
+	>>> pic = torch.tensor(1.0)
+	>>> pic.mul(255).byte()
+	tensor(255, dtype=torch.uint8)
+	>>> pic = torch.tensor(0.99999)
+	>>> pic.mul(255).byte()
+	tensor(254, dtype=torch.uint8)
+
+Considering the numerical isses, this is more serious: 
+
+	for i in range(256):
+		fi = float(i)
+		ii = int(fi / 255 / 0.223 * 0.223 * 255)
+		if ii != i:
+		   print(i, ii)
+
+x / 255: torch's conversion
+x / 0.223 * 0.223: calculation carried out
+int(x * 255): torch's naive quantisation
+
+output: 
+
+	57 56
+	114 113
+	228 227
+	233 232
+	239 238
+	241 240
+	247 246
+	253 252
+	255 254
+
+
+If the issue with the previously mentioned dequantisation is minor, this
+one is MAJOR. 
+
+The way with correct probability (without considering numerical issue)
+is described as following: 
+
+Divide [0, 1] to 256 parts equally, if x is within the k-th part, assign
+x' to be k.
+
+If we want to consider some practical issues (the quantisation of
+float-32 type), we can map [0, 1] to [0, 1) or (0, 1] and do the
+procedure stated above. 
+
+You may say it is possible to merge two number in (0, 1) to one (or even
+more pairs), but we definitely care more about 0 and 1 than the
+number in between. 
+
+	x = round_upward(min(x + FLT_EPSILON, 1) * 256) - 1
+	or 
+	x = round_downward(x * MINTOONE * 256) 
+	
+where `FLT_EPSILON` is the smallest positive number, and `MINTOONE` is
+the greatest number less than one or `(1 - FLT_EPSILON)`.
+
+For all number in arbitrary range in [a, b], we can perform the same
+procedure.
+
+Note, if we consider practical issues, float numbers do not have
+associative law. 
+
+
+= X. References
+
+[RNADE]: Benigno Uria and Iain Murray and Hugo Larochelle, RNADE: The real-valued neural autoregressive density-estimator

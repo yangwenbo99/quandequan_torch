@@ -60,7 +60,7 @@ def read_img(fname) -> np.ndarray:
     '''
     pf = Path(fname)
     if pf.suffix.lower() == '.tiff':
-        return tifffile.imread(fname)
+        return tifffile.imread(fname).astype(np.float32)
     else:
         npimg = np.array(Image.open(pf))
         return npimg.transpose((2, 0, 1))

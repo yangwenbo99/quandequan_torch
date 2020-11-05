@@ -4,7 +4,8 @@ Some of these are adapted from torch
 '''
 from . import functional as F
 import torch
-from torchvision import functional as TF
+import numpy as np
+from torchvision.transforms import functional as TF
 
 
 #import random_dequantize

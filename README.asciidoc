@@ -60,7 +60,8 @@ Suppose x is correctly in [0, 1]
 They multiply x by 255, then round it downward.  Then, suppose the
 image is generated with a uniform distribution in [0, 1]; we are
 expecting to see the mapped distribution also a uniform distribution in
-{0, ..., 255}. 
+{0, ..., 255}, but what's the real case?  It has a probability 0 for 
+the dequantised version to be 255.
 
 What about other probability distribution?  as long as the distribution
 is without odd point, it has 0% of probability to be 255, after being scaled
